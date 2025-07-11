@@ -1,14 +1,15 @@
 import pandas as pd
-from pybaseball import statcast
-from datetime import datetime, timedelta
+#from pybaseball import statcast
+#from datetime import datetime, timedelta
 import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.cluster import KMeans
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 from xgboost import XGBClassifier
 from sklearn.metrics import accuracy_score, roc_auc_score, classification_report
 from sklearn.model_selection import GridSearchCV
-import xgboost as xgb
+#import xgboost as xgb
+"""
 start_date = datetime(2024, 3, 28)
 end_date = datetime(2024, 10, 1)
 all_data = []
@@ -48,6 +49,7 @@ qualified_pitchers = [
 ]
 filtered_df = full_df[full_df['player_name'].isin(qualified_pitchers)]
 filtered_df.to_csv("statcast_filtered.csv", index = False)
+"""
 filtered_df = pd.read_csv('statcast_filtered.csv')
 missing = filtered_df[(filtered_df['type'] == 'X') & (filtered_df['estimated_woba_using_speedangle'].isna())]
 print(f"Missing expected_woba rows: {len(missing)}")
@@ -67,7 +69,7 @@ filtered_df['success'] = np.where(
 )
 
 pitch_types = filtered_df['pitch_type'].dropna().unique().tolist()
-print(pitch_types)
+#print(pitch_types)
 
 fastballs = ['FF', 'FT', 'SI', 'FC', 'FA']
 breaking_balls = ['SL', 'CU', 'KC', 'KN', 'ST', 'SB']
@@ -97,7 +99,7 @@ for k in K:
     kmeans = KMeans(n_clusters = k, random_state = 42)
     kmeans.fit(pitch_mix)
     inertia.append(kmeans.inertia_)
-
+"""
 plt.figure(figsize=(8, 5))
 plt.plot(K, inertia, 'o-')
 plt.xlabel('Number of clusters (k)')
@@ -106,7 +108,7 @@ plt.title('Elbow method for optimal k')
 plt.xticks(K)
 plt.grid(True)
 plt.show()
-
+"""
 kmeans = KMeans(n_clusters=4, random_state=42)
 pitch_mix['cluster'] = kmeans.fit_predict(pitch_mix)
 
@@ -187,10 +189,10 @@ print("Best cross-val AUC:", grid_search.best_score_)
 
 best_model = grid_search.best_estimator_
 
-xgb.plot_importance(best_model, max_num_features=10)
-plt.title('Top 10 Feature Importances')
-plt.tight_layout()
-plt.show()
+#xgb.plot_importance(best_model, max_num_features=10)
+#plt.title('Top 10 Feature Importances')
+#plt.tight_layout()
+#plt.show()
 
 def get_pitch_options(pitcher_name, df, min_usage = 50):
     pitcher_data = df[df['player_name'] == pitcher_name]
@@ -237,7 +239,7 @@ current_context = {
     'plate_x': 0.1,
     'plate_z': 2.5
 }
-print(recommend_pitch('Webb, Logan', current_context, best_model, X_columns))
+#print(recommend_pitch('Webb, Logan', current_context, best_model, X_columns))
 
 
 
