@@ -1,9 +1,20 @@
+"""
+app.py
+
+Streamlit web app for recommending baseball pitches using a trained machine learning
+model. Users can select a pitcher and input game context (count, runners on, location),
+and the app will return pitch type recommendations ranked by predicted success
+probability.
+"""
+
 import streamlit as st
 from analysis import recommend_pitch, filtered_df, best_model, X_columns
 
+# Title and description
 st.title("Pitch Recommender System")
 st.markdown("This tool uses Machine Learning to make pitch recommendations based on given situations.")
 
+# User input widgets for context features
 pitcher_name = st.selectbox("Select Pitcher", sorted(filtered_df["player_name"].unique()))
 stand = st.selectbox("Batter Stance (Left/Right)", ['L', 'R'])
 p_throws = st.selectbox("Pitcher Throws (Left/Right)", ['L', 'R'])
@@ -14,7 +25,9 @@ inning = st.slider("Inning", 1, 9, 1)
 plate_x = st.slider("Plate X Location", -1.5, 1.5, 0.0)
 plate_z = st.slider("Plate Z Location", 0.0, 5.0, 2.5)
 
+# When user clicks button, generate recommendations
 if st.button("Recommend Pitch"):
+    # Assemble game context into dictionary
     current_context = {
         'stand': stand,
         'p_throws': p_throws,
@@ -25,10 +38,10 @@ if st.button("Recommend Pitch"):
         'plate_x': plate_x,
         'plate_z': plate_z
     }
-
+    # Generate recommendations using trained model
     recommendations = recommend_pitch(pitcher_name, current_context, best_model, X_columns)
+    # Display results
     st.subheader("Recommended Pitches (Ranked By Success Probability)")
     st.dataframe(recommendations)
-
+    # Bar chart of predicted success probabilities
     st.bar_chart(recommendations.set_index('pitch_type'))
-

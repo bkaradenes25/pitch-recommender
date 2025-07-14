@@ -1,3 +1,16 @@
+"""
+data_prep.py
+
+Prepares 2024 Statcast data for use in a pitch recommendation model.
+
+Main steps:
+- Downloads and filters data for selected pitchers
+- Engineers features including pitch category, count, and on-base
+- Clusters pitchers by pitch mix
+- Trains and tunes an XGBoost model to predict pitch success
+- Saves the trained model and feature columns for use in app
+"""
+
 import pandas as pd
 from pybaseball import statcast
 from datetime import datetime, timedelta
@@ -8,11 +21,13 @@ from xgboost import XGBClassifier
 from sklearn.metrics import accuracy_score, roc_auc_score, classification_report
 import joblib
 
+# Download Statcast data
+
 start_date = datetime(2024, 3, 28)
 end_date = datetime(2024, 10, 1)
 all_data = []
 
-delta = timedelta(days = 7)
+delta = timedelta(days=7)
 current_date = start_date
 
 while current_date < end_date:
@@ -20,8 +35,8 @@ while current_date < end_date:
     print(f"Downloading: {current_date.date()} to {next_date.date()}")
 
     try:
-        chunk = statcast(start_dt = current_date.strftime("%Y-%m-%d"),
-                         end_dt = next_date.strftime("%Y-%m-%d"))
+        chunk = statcast(start_dt=current_date.strftime("%Y-%m-%d"),
+                         end_dt=next_date.strftime("%Y-%m-%d"))
         all_data.append(chunk)
     except Exception as e:
         print(f"Failed on chunk {current_date.date()} to {next_date.date()}: {e}")
@@ -29,7 +44,9 @@ while current_date < end_date:
     current_date = next_date + timedelta(days=1)
 
 full_df = pd.concat(all_data, ignore_index=True)
-full_df.to_csv("statcast_2024_full.csv", index = False)
+full_df.to_csv("statcast_2024_full.csv", index=False)
+
+# Filter for qualified pitchers
 
 qualified_pitchers = [
     "Gilbert, Logan", "Lugo, Seth", "Webb, Logan", "Wheeler, Zack", "Nola, Aaron",
@@ -47,16 +64,21 @@ qualified_pitchers = [
 ]
 
 filtered_df = full_df[full_df['player_name'].isin(qualified_pitchers)]
-filtered_df.to_csv("statcast_filtered.csv", index = False)
+filtered_df.to_csv("statcast_filtered.csv", index=False)
+
+# Clean and label outcomes
 
 filtered_df = pd.read_csv('statcast_filtered.csv')
 missing = filtered_df[(filtered_df['type'] == 'X') & (filtered_df['estimated_woba_using_speedangle'].isna())]
 print(f"Missing expected_woba rows: {len(missing)}")
 filtered_df = filtered_df[~((filtered_df['type'] == 'X') & (filtered_df['estimated_woba_using_speedangle'].isna()))]
+
+# Label pitch success: 1 = good outcome, 0 = bad outcome
+
 filtered_df['success'] = np.where(
     (
-        filtered_df['estimated_woba_using_speedangle'].notna() &
-        (filtered_df['estimated_woba_using_speedangle'] <= 0.300)
+            filtered_df['estimated_woba_using_speedangle'].notna() &
+            (filtered_df['estimated_woba_using_speedangle'] <= 0.300)
     ) | (filtered_df['description'].isin(['called_strike', 'swinging_strike'])),
     1,
     np.where(
@@ -70,6 +92,8 @@ filtered_df['success'] = np.where(
 pitch_types = filtered_df['pitch_type'].dropna().unique().tolist()
 print(pitch_types)
 
+# Categorize pitch categories
+
 fastballs = ['FF', 'FT', 'SI', 'FC', 'FA']
 breaking_balls = ['SL', 'CU', 'KC', 'KN', 'ST', 'SB']
 offspeed = ['FS', 'CH', 'EP', 'SC']
@@ -80,13 +104,15 @@ conditions = [
 ]
 choices = ['fastballs', 'breaking_balls', 'offspeed']
 
-filtered_df['pitch_cat'] = np.select(conditions, choices, default = 'other')
+filtered_df['pitch_cat'] = np.select(conditions, choices, default='other')
+
+# Cluster pitches by pitch mix
 
 pitch_mix = (
     filtered_df
     .groupby(['player_name', 'pitch_cat'])
     .size()
-    .unstack(fill_value = 0)
+    .unstack(fill_value=0)
 )
 
 pitch_mix = pitch_mix.div(pitch_mix.sum(axis=1), axis=0)
@@ -94,21 +120,30 @@ pitch_mix = pitch_mix.div(pitch_mix.sum(axis=1), axis=0)
 inertia = []
 K = range(1, 11)
 
+# Elbow method for K
+
 for k in K:
-    kmeans = KMeans(n_clusters = k, random_state = 42)
+    kmeans = KMeans(n_clusters=k, random_state=42)
     kmeans.fit(pitch_mix)
     inertia.append(kmeans.inertia_)
+
+# Uses k=4 based on elbow analysis
 
 kmeans = KMeans(n_clusters=4, random_state=42)
 pitch_mix['cluster'] = kmeans.fit_predict(pitch_mix)
 
 pitch_mix_with_cluster = pitch_mix.copy().reset_index()
-pitch_mix_with_cluster.to_csv("pitch_mix_with_cluster.csv", index = False)
+pitch_mix_with_cluster.to_csv("pitch_mix_with_cluster.csv", index=False)
+
+# Add cluster to main dataframe
+
 filtered_df = filtered_df.merge(
     pitch_mix_with_cluster[['player_name', 'cluster']],
     on='player_name',
     how='left'
 )
+
+# Feature engineering
 
 filtered_df['count'] = filtered_df['strikes'] - filtered_df['balls']
 
@@ -125,15 +160,21 @@ features = [
 
 target = 'success'
 
+# Train and evaluate XGBoost model
+
 df_model = filtered_df.dropna(subset=features + [target])
 df_encoded = pd.get_dummies(df_model[features + [target]], drop_first=True)
 
 X = df_encoded.drop(columns=[target])
 y = df_encoded[target]
 
-X_train, X_temp, y_train, y_temp = train_test_split(X, y, test_size = 0.30, random_state = 42, stratify=y)
+# Train/val/test split
 
-X_val, X_test, y_val, y_test = train_test_split(X_temp, y_temp, test_size=0.50, random_state=42, stratify = y_temp)
+X_train, X_temp, y_train, y_temp = train_test_split(X, y, test_size=0.30, random_state=42, stratify=y)
+
+X_val, X_test, y_val, y_test = train_test_split(X_temp, y_temp, test_size=0.50, random_state=42, stratify=y_temp)
+
+# Baseline model
 
 model = XGBClassifier(
     n_estimators=100,
@@ -158,8 +199,10 @@ y_test_prob = model.predict_proba(X_test)[:, 1]
 print("Test Accuracy:", accuracy_score(y_test, y_test_pred))
 print("Test ROC AUC:", roc_auc_score(y_test, y_test_prob))
 
+# Hyperparameter tuning
+
 param_grid = {
-    'max_depth': [5,7,9],
+    'max_depth': [5, 7, 9],
     'learning_rate': [0.01, 0.1, 0.2],
     'n_estimators': [50, 100, 150],
 }
@@ -193,7 +236,7 @@ current_context = {
     'plate_z': 2.5
 }
 
+# Save Model artifacts
+
 joblib.dump(best_model, "best_model.pkl")
 joblib.dump(X.columns, "X_columns.pkl")
-
-
