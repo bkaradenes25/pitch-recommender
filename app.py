@@ -1,12 +1,5 @@
 import streamlit as st
-import joblib
-from analysis import recommend_pitch, filtered_df, best_model, X
-
-joblib.dump(best_model, "best_model.pk1")
-joblib.dump(X.columns, "X_columns.pk1")
-
-model = joblib.load("best_model.pk1")
-X_columns = joblib.load("X_columns.pk1")
+from analysis import recommend_pitch, filtered_df, best_model, X_columns
 
 st.title("Pitch Recommender System")
 st.markdown("This tool uses Machine Learning to make pitch recommendations based on given situations.")
@@ -33,7 +26,7 @@ if st.button("Recommend Pitch"):
         'plate_z': plate_z
     }
 
-    recommendations = recommend_pitch(pitcher_name, current_context, model, X_columns)
+    recommendations = recommend_pitch(pitcher_name, current_context, best_model, X_columns)
     st.subheader("Recommended Pitches (Ranked By Success Probability)")
     st.dataframe(recommendations)
 
