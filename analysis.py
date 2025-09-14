@@ -13,9 +13,17 @@ import joblib
 # Load data and model
 
 filtered_df = pd.read_csv('statcast_filtered.csv')
+hitter_clusters = pd.read_csv('hitter_clusters.csv')
 pitch_mix_with_cluster = pd.read_csv("pitch_mix_with_cluster.csv")
 best_model = joblib.load("best_model.pkl")
 X_columns = joblib.load("X_columns.pkl")
+
+filtered_df = filtered_df.merge(
+    hitter_clusters[['player_id', 'hitter_cluster']],
+    left_on = 'batter',
+    right_on = 'player_id',
+    how = 'left'
+)
 
 
 def get_pitch_options(pitcher_name, df, min_usage=50):

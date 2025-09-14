@@ -16,10 +16,12 @@ from pybaseball import statcast
 from datetime import datetime, timedelta
 import numpy as np
 from sklearn.model_selection import train_test_split, GridSearchCV
-from sklearn.cluster import KMeans
 from xgboost import XGBClassifier
 from sklearn.metrics import accuracy_score, roc_auc_score, classification_report
 import joblib
+from sklearn.preprocessing import StandardScaler
+from sklearn.cluster import KMeans
+import matplotlib.pyplot as plt
 
 # Download Statcast data
 
@@ -143,6 +145,47 @@ filtered_df = filtered_df.merge(
     how='left'
 )
 
+# Hitter Work
+hitters_df = pd.read_csv("hitting_data.csv")
+print(hitters_df.columns)
+hitter_features = [
+    'iso', 'slg', 'babip', 'xba', 'xwoba', 'xslg',
+    'k_percent', 'bb_percent', 'swing_miss_percent',
+    'hardhit_percent', 'barrels_per_bbe_percent', 'barrels_per_pa_percent',
+    'launch_angle', 'launch_speed', 'attack_angle', 'attack_direction'
+]
+
+X = hitters_df[hitter_features].dropna()
+
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
+inertia = []
+K = range(1, 11)
+
+for k in K:
+    kmeans = KMeans(n_clusters=k, random_state=42)
+    kmeans.fit(X_scaled)
+    inertia.append(kmeans.inertia_)
+
+plt.plot(K, inertia, 'bo-')
+plt.xlabel("Number of Clusters (k)")
+plt.ylabel("Inertia")
+plt.title("Elbow Method for Optimal k - Hitter Clustering")
+plt.show()
+
+kmeans = KMeans(n_clusters=5, random_state=42)
+hitters_df.loc[X.index, 'hitter_cluster'] = kmeans.fit_predict(X_scaled)
+
+hitters_df[['player_id', 'player_name', 'hitter_cluster']].to_csv("hitter_clusters.csv", index = False)
+
+filtered_df = filtered_df.merge(
+    hitters_df[['player_id', 'hitter_cluster']],
+    left_on = 'batter',
+    right_on = 'player_id',
+    how = 'left'
+)
+
 # Feature engineering
 
 filtered_df['count'] = filtered_df['strikes'] - filtered_df['balls']
@@ -240,3 +283,6 @@ current_context = {
 
 joblib.dump(best_model, "best_model.pkl")
 joblib.dump(X.columns, "X_columns.pkl")
+
+
+
