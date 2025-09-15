@@ -8,7 +8,8 @@ probability.
 """
 
 import streamlit as st
-from analysis import recommend_pitch, filtered_df, best_model, X_columns
+from analysis import recommend_pitch, filtered_df, best_model, X_columns, hitter_clusters
+from data_prep import hitters_df
 
 # Title and description
 st.title("Pitch Recommender System")
@@ -25,6 +26,20 @@ inning = st.slider("Inning", 1, 9, 1)
 plate_x = st.slider("Plate X Location", -1.5, 1.5, 0.0)
 plate_z = st.slider("Plate Z Location", 0.0, 5.0, 2.5)
 
+hitter_clusters_label = {
+    0: "Balanced Power Hitter",
+    1: "Light-Hitting Contact",
+    2: "Elite Power/On-Base",
+    3: "High Contact / Low Power",
+    4: "Disciplined Power Hitter"
+}
+
+hitter_cluster = st.selectbox(
+    "Select Hitter Cluster",
+    options = [0,1,2,3,4],
+    format_func=lambda x: hitter_clusters_label[x]
+)
+
 # When user clicks button, generate recommendations
 if st.button("Recommend Pitch"):
     # Assemble game context into dictionary
@@ -36,7 +51,8 @@ if st.button("Recommend Pitch"):
         'outs_when_up': outs_when_up,
         'inning': inning,
         'plate_x': plate_x,
-        'plate_z': plate_z
+        'plate_z': plate_z,
+        'hitter_cluster': hitter_cluster
     }
     # Generate recommendations using trained model
     recommendations = recommend_pitch(pitcher_name, current_context, best_model, X_columns)

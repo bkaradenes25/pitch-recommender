@@ -198,7 +198,8 @@ filtered_df['on_base'] = np.where(
 
 features = [
     'pitch_type', 'stand', 'p_throws', 'on_base',
-    'count', 'outs_when_up', 'inning', 'plate_x', 'plate_z', 'cluster'
+    'count', 'outs_when_up', 'inning', 'plate_x', 'plate_z', 'cluster',
+    'hitter_cluster'
 ]
 
 target = 'success'
