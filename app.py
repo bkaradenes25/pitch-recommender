@@ -8,8 +8,8 @@ probability.
 """
 
 import streamlit as st
-from analysis import recommend_pitch, filtered_df, best_model, X_columns, hitter_clusters
-from data_prep import hitters_df
+from analysis import recommend_pitch, filtered_df, best_model, X_columns
+
 
 # Title and description
 st.title("Pitch Recommender System")
